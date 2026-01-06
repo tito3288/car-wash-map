@@ -76,11 +76,16 @@ const getMarkerIcon = (zoom, pinType = 'open', isPreview = false) => {
 
 // Shape colors
 const SHAPE_COLORS = {
-  red: '#DC2626',
-  blue: '#3B82F6',
-  green: '#22C55E',
-  purple: '#8B5CF6',
-  orange: '#F97316',
+  red: '#DC2626',       // Bright red
+  blue: '#2563EB',      // True blue
+  green: '#16A34A',     // Forest green
+  purple: '#9333EA',    // Violet purple
+  orange: '#EA580C',    // Deep orange
+  yellow: '#FACC15',    // Golden yellow
+  pink: '#DB2777',      // Hot pink
+  cyan: '#06B6D4',      // Cyan/Turquoise
+  brown: '#92400E',     // Brown
+  black: '#1F2937',     // Dark gray/black
 };
 
 // Shape recognition utilities
@@ -281,6 +286,9 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
   const [currentZoom, setCurrentZoom] = useState(10);
   const [tooltipMarker, setTooltipMarker] = useState(null);
   
+  // Track if initial center has been set (to prevent jumping on re-renders)
+  const initialCenterSetRef = useRef(false);
+  
   // Drawing state
   const [isPencilMode, setIsPencilMode] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -294,7 +302,15 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
   const onLoad = useCallback((map) => {
     setMap(map);
     setCurrentZoom(map.getZoom());
-  }, []);
+    
+    // Set initial center based on markers if they exist
+    if (markers.length > 0 && !initialCenterSetRef.current) {
+      const lastMarker = markers[markers.length - 1];
+      map.setCenter({ lat: lastMarker.lat, lng: lastMarker.lng });
+      map.setZoom(15);
+      initialCenterSetRef.current = true;
+    }
+  }, [markers]);
 
   const onUnmount = useCallback(() => {
     setMap(null);
@@ -305,6 +321,20 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
       setCurrentZoom(map.getZoom());
     }
   }, [map]);
+
+  // Track previous markers count to detect new markers
+  const prevMarkersCountRef = useRef(markers.length);
+  
+  // Pan to new marker when added (but not on other re-renders)
+  useEffect(() => {
+    if (map && markers.length > prevMarkersCountRef.current) {
+      // A new marker was added, pan to it
+      const lastMarker = markers[markers.length - 1];
+      map.panTo({ lat: lastMarker.lat, lng: lastMarker.lng });
+      map.setZoom(15);
+    }
+    prevMarkersCountRef.current = markers.length;
+  }, [map, markers]);
 
   // Handle marker hover
   const handleMarkerMouseOver = useCallback((marker) => {
@@ -486,9 +516,14 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
   }, [isDrawing, handleMapMouseUp]);
 
-  const center = markers.length > 0 
-    ? { lat: markers[markers.length - 1].lat, lng: markers[markers.length - 1].lng }
-    : defaultCenter;
+  // Initial center - only used on first render, map position is user-controlled after that
+  const initialCenter = useMemo(() => {
+    if (markers.length > 0) {
+      const lastMarker = markers[markers.length - 1];
+      return { lat: lastMarker.lat, lng: lastMarker.lng };
+    }
+    return defaultCenter;
+  }, []); // Empty deps - only compute once on mount
 
   if (loadError) {
     return (
@@ -516,8 +551,8 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
     <div className="relative w-full h-full">
       <GoogleMap
         mapContainerStyle={containerStyle}
-        center={center}
-        zoom={markers.length > 0 ? 15 : 10}
+        center={initialCenter}
+        zoom={10}
         onLoad={onLoad}
         onUnmount={onUnmount}
         onZoomChanged={onZoomChanged}
