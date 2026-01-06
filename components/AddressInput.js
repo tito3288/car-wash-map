@@ -7,10 +7,10 @@ const libraries = ['places'];
 
 // Pin types - keep in sync with MapComponent
 const PIN_TYPES = {
-  open: { color: '#22C55E', label: 'Open', icon: '✓' },
-  coming_soon: { color: '#F59E0B', label: 'Coming Soon', icon: '◷' },
-  closed: { color: '#6B7280', label: 'Closed', icon: '✕' },
-  prospect: { color: '#3B82F6', label: 'Prospect', icon: '?' },
+  open: { bodyColor: '#d32f2f', label: 'Open', icon: '✓' },           // Red body, Blue inner
+  coming_soon: { bodyColor: '#3B82F6', label: 'Coming Soon', icon: '◷' }, // Blue body
+  closed: { bodyColor: '#6B7280', label: 'Closed', icon: '✕' },       // Gray body
+  prospect: { bodyColor: '#F59E0B', label: 'Prospect', icon: '?' },   // Orange body
 };
 
 export default function AddressInput({ onAddressSubmit, loading }) {
@@ -101,7 +101,7 @@ export default function AddressInput({ onAddressSubmit, loading }) {
           Location Type
         </label>
         <div className="grid grid-cols-2 gap-2">
-          {Object.entries(PIN_TYPES).map(([key, { color, label }]) => (
+          {Object.entries(PIN_TYPES).map(([key, { bodyColor, label }]) => (
             <button
               key={key}
               type="button"
@@ -114,7 +114,7 @@ export default function AddressInput({ onAddressSubmit, loading }) {
             >
               <span
                 className="w-3 h-3 rounded-full flex-shrink-0"
-                style={{ backgroundColor: color }}
+                style={{ backgroundColor: bodyColor }}
               />
               <span className="text-gray-700">{label}</span>
             </button>

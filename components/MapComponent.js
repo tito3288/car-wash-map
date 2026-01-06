@@ -15,12 +15,12 @@ const defaultCenter = {
 
 const libraries = ['places'];
 
-// Pin types with colors and labels
+// Pin types with body color, inner circle color, and labels
 export const PIN_TYPES = {
-  open: { color: '#22C55E', label: 'Open', icon: '✓' },
-  coming_soon: { color: '#F59E0B', label: 'Coming Soon', icon: '◷' },
-  closed: { color: '#6B7280', label: 'Closed', icon: '✕' },
-  prospect: { color: '#3B82F6', label: 'Prospect', icon: '?' },
+  open: { bodyColor: '#d32f2f', innerColor: '#1a1a6e', label: 'Open', icon: '✓' },           // Red body, Blue inner
+  coming_soon: { bodyColor: '#3B82F6', innerColor: '#1a1a6e', label: 'Coming Soon', icon: '◷' }, // Blue body, Dark inner
+  closed: { bodyColor: '#6B7280', innerColor: '#374151', label: 'Closed', icon: '✕' },       // Gray body, Dark gray inner
+  prospect: { bodyColor: '#F59E0B', innerColor: '#1a1a6e', label: 'Prospect', icon: '?' },   // Orange body, Dark inner
 };
 
 // Dynamic marker icon based on zoom level and pin type
@@ -42,24 +42,31 @@ const getMarkerIcon = (zoom, pinType = 'open', isPreview = false) => {
     scale = 1.0;
   }
 
-  const baseWidth = 28;
-  const baseHeight = 42;
+  // Pin dimensions matching original design (24x40 viewBox)
+  const baseWidth = 24;
+  const baseHeight = 40;
   const width = Math.round(baseWidth * scale);
   const height = Math.round(baseHeight * scale);
   
-  // Get color based on pin type
-  const color = PIN_TYPES[pinType]?.color || PIN_TYPES.open.color;
+  // Get colors based on pin type
+  const pinConfig = PIN_TYPES[pinType] || PIN_TYPES.open;
+  const bodyColor = pinConfig.bodyColor;
+  const innerColor = pinConfig.innerColor;
 
   return {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 28 42">
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 24 40">
         <defs>
-          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="1" stdDeviation="1" flood-opacity="0.3"/>
+          <filter id="shadow" x="-30%" y="-10%" width="160%" height="130%">
+            <feDropShadow dx="1" dy="1" stdDeviation="1" flood-opacity="0.3"/>
           </filter>
         </defs>
-        <path filter="url(#shadow)" fill="${color}" d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 28 14 28s14-17.5 14-28C28 6.268 21.732 0 14 0z"/>
-        <circle fill="#fff" cx="14" cy="12" r="5"/>
+        <!-- Thin pin body -->
+        <path d="M12 0 C6 0 2 4 2 10 C2 18 12 40 12 40 S22 18 22 10 C22 4 18 0 12 0 Z" fill="${bodyColor}" filter="url(#shadow)"/>
+        <!-- Inner circle -->
+        <circle cx="12" cy="10" r="6" fill="${innerColor}"/>
+        <!-- White center dot -->
+        <circle cx="12" cy="10" r="2.5" fill="white"/>
       </svg>
     `),
     scaledSize: typeof window !== 'undefined' ? new window.google.maps.Size(width, height) : null,

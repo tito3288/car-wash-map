@@ -4,10 +4,10 @@ import { useState } from 'react';
 
 // Pin types - keep in sync with MapComponent
 const PIN_TYPES = {
-  open: { color: '#22C55E', label: 'Open' },
-  coming_soon: { color: '#F59E0B', label: 'Coming Soon' },
-  closed: { color: '#6B7280', label: 'Closed' },
-  prospect: { color: '#3B82F6', label: 'Prospect' },
+  open: { bodyColor: '#d32f2f', label: 'Open' },           // Red body, Blue inner
+  coming_soon: { bodyColor: '#3B82F6', label: 'Coming Soon' }, // Blue body
+  closed: { bodyColor: '#6B7280', label: 'Closed' },       // Gray body
+  prospect: { bodyColor: '#F59E0B', label: 'Prospect' },   // Orange body
 };
 
 export default function PinnedAddressList({ markers, onRemoveMarker, onUpdateMarker }) {
@@ -46,7 +46,7 @@ export default function PinnedAddressList({ markers, onRemoveMarker, onUpdateMar
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <span 
                     className="flex-shrink-0 w-6 h-6 text-white text-xs font-bold rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: pinType.color }}
+                    style={{ backgroundColor: pinType.bodyColor }}
                   >
                     {index + 1}
                   </span>
@@ -69,7 +69,7 @@ export default function PinnedAddressList({ markers, onRemoveMarker, onUpdateMar
               <div className="mt-2 flex items-center gap-2">
                 {isEditing ? (
                   <div className="flex flex-wrap gap-1">
-                    {Object.entries(PIN_TYPES).map(([key, { color, label }]) => (
+                    {Object.entries(PIN_TYPES).map(([key, { bodyColor, label }]) => (
                       <button
                         key={key}
                         onClick={() => handleTypeChange(index, key)}
@@ -79,11 +79,11 @@ export default function PinnedAddressList({ markers, onRemoveMarker, onUpdateMar
                             : 'hover:bg-gray-100'
                         }`}
                         style={{ 
-                          backgroundColor: marker.pinType === key || (!marker.pinType && key === 'open') ? `${color}20` : 'transparent',
-                          color: color 
+                          backgroundColor: marker.pinType === key || (!marker.pinType && key === 'open') ? `${bodyColor}20` : 'transparent',
+                          color: bodyColor 
                         }}
                       >
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: bodyColor }} />
                         {label}
                       </button>
                     ))}
@@ -92,9 +92,9 @@ export default function PinnedAddressList({ markers, onRemoveMarker, onUpdateMar
                   <button
                     onClick={() => setEditingIndex(index)}
                     className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium hover:bg-gray-100 transition-colors"
-                    style={{ color: pinType.color }}
+                    style={{ color: pinType.bodyColor }}
                   >
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: pinType.color }} />
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: pinType.bodyColor }} />
                     {pinType.label}
                     <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -111,9 +111,9 @@ export default function PinnedAddressList({ markers, onRemoveMarker, onUpdateMar
       <div className="mt-4 pt-3 border-t border-gray-200">
         <p className="text-xs text-gray-500 mb-2">Legend:</p>
         <div className="flex flex-wrap gap-2">
-          {Object.entries(PIN_TYPES).map(([key, { color, label }]) => (
+          {Object.entries(PIN_TYPES).map(([key, { bodyColor, label }]) => (
             <span key={key} className="flex items-center gap-1 text-xs text-gray-600">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: bodyColor }} />
               {label}
             </span>
           ))}
