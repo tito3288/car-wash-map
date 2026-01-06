@@ -27,7 +27,9 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [markers, setMarkers] = useState([]);
+  const [shapes, setShapes] = useState([]);
   const [markersLoading, setMarkersLoading] = useState(true);
+  const [shapesLoading, setShapesLoading] = useState(true);
   const [geocoding, setGeocoding] = useState(false);
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -79,6 +81,61 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [user]);
 
+  // Load shapes from Firestore when user is authenticated
+  useEffect(() => {
+    if (!user) return;
+
+    const shapesRef = collection(db, 'users', user.uid, 'shapes');
+    
+    // Real-time listener for shapes
+    const unsubscribe = onSnapshot(shapesRef, (snapshot) => {
+      const loadedShapes = [];
+      snapshot.forEach((doc) => {
+        loadedShapes.push({ id: doc.id, ...doc.data() });
+      });
+      // Sort by createdAt timestamp
+      loadedShapes.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      setShapes(loadedShapes);
+      setShapesLoading(false);
+    }, (error) => {
+      console.error('Error loading shapes:', error);
+      setShapesLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Handle shapes change from MapComponent
+  const handleShapesChange = async (newShapes) => {
+    if (!user) return;
+
+    // Optimistic update - update UI immediately
+    setShapes(newShapes);
+
+    try {
+      const shapesRef = collection(db, 'users', user.uid, 'shapes');
+      
+      const currentIds = shapes.map(s => s.id);
+      const newIds = newShapes.map(s => s.id);
+      
+      // Add or update shapes
+      for (const shape of newShapes) {
+        const shapeDocRef = doc(shapesRef, shape.id);
+        await setDoc(shapeDocRef, shape);
+      }
+      
+      // Delete removed shapes
+      for (const shape of shapes) {
+        if (!newIds.includes(shape.id)) {
+          await deleteDoc(doc(db, 'users', user.uid, 'shapes', shape.id));
+        }
+      }
+    } catch (err) {
+      console.error('Error updating shapes:', err);
+      setError('Failed to save shape. Please try again.');
+    }
+  };
+
   const geocodeAddress = async (address) => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
@@ -102,7 +159,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleAddressSubmit = async (address) => {
+  const handleAddressSubmit = async (address, pinType = 'open') => {
     if (!user) return;
     
     setGeocoding(true);
@@ -111,11 +168,12 @@ export default function Dashboard() {
     try {
       const result = await geocodeAddress(address);
       
-      // Save to Firestore
+      // Save to Firestore with pin type
       const markersRef = collection(db, 'users', user.uid, 'markers');
       const newMarkerRef = doc(markersRef);
       await setDoc(newMarkerRef, {
         ...result,
+        pinType,
         createdAt: Date.now(),
       });
       
@@ -140,6 +198,28 @@ export default function Dashboard() {
       } catch (err) {
         console.error('Error removing marker:', err);
         setError('Failed to remove pin. Please try again.');
+      }
+    }
+  };
+
+  // Update a marker (e.g., change pin type)
+  const handleUpdateMarker = async (index, updatedMarker) => {
+    if (!user) return;
+    
+    const marker = markers[index];
+    if (marker?.id) {
+      try {
+        // Optimistic update
+        const newMarkers = [...markers];
+        newMarkers[index] = { ...marker, ...updatedMarker };
+        setMarkers(newMarkers);
+        
+        // Update in Firestore
+        const markerRef = doc(db, 'users', user.uid, 'markers', marker.id);
+        await setDoc(markerRef, { ...marker, ...updatedMarker });
+      } catch (err) {
+        console.error('Error updating marker:', err);
+        setError('Failed to update pin. Please try again.');
       }
     }
   };
@@ -364,7 +444,11 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <PinnedAddressList markers={markers} onRemoveMarker={handleRemoveMarker} />
+            <PinnedAddressList 
+              markers={markers} 
+              onRemoveMarker={handleRemoveMarker}
+              onUpdateMarker={handleUpdateMarker}
+            />
           )}
         </div>
 
@@ -389,7 +473,7 @@ export default function Dashboard() {
 
       {/* Map */}
       <div className="flex-1 relative">
-        <MapComponent markers={markers} />
+        <MapComponent markers={markers} shapes={shapes} onShapesChange={handleShapesChange} />
         
         {/* Mobile menu button */}
         <button
