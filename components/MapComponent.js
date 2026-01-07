@@ -2,6 +2,8 @@
 
 import { GoogleMap, Marker, useJsApiLoader, InfoWindow, Polygon, Polyline } from '@react-google-maps/api';
 import { useCallback, useState, useMemo, useRef, useEffect } from 'react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 const containerStyle = {
   width: '100%',
@@ -296,6 +298,14 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
   const [selectedShape, setSelectedShape] = useState(null);
   const [selectedColor, setSelectedColor] = useState('red');
   
+  // Download state
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const mapContainerRef = useRef(null);
+  
+  // Delete confirmation modal state
+  const [showDeleteAllShapesModal, setShowDeleteAllShapesModal] = useState(false);
+  
   // Shape refs for editing
   const shapeRefs = useRef({});
 
@@ -516,6 +526,73 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
   }, [isDrawing, handleMapMouseUp]);
 
+  // Close download menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showDownloadMenu && !e.target.closest('.download-menu-container')) {
+        setShowDownloadMenu(false);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showDownloadMenu]);
+
+  // Download map as image
+  const downloadMap = useCallback(async (format) => {
+    if (!mapContainerRef.current) return;
+    
+    setIsDownloading(true);
+    setShowDownloadMenu(false);
+    
+    try {
+      // Small delay to ensure UI updates are hidden
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const canvas = await html2canvas(mapContainerRef.current, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 2, // Higher resolution
+        logging: false,
+        backgroundColor: '#ffffff',
+        ignoreElements: (element) => {
+          // Hide download button and other UI during capture
+          return element.classList?.contains('download-menu-container') || 
+                 element.classList?.contains('hide-on-download');
+        }
+      });
+      
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+      
+      if (format === 'pdf') {
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const pdf = new jsPDF({
+          orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+          unit: 'px',
+          format: [canvas.width, canvas.height]
+        });
+        pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+        pdf.save(`map-export-${timestamp}.pdf`);
+      } else {
+        const link = document.createElement('a');
+        link.download = `map-export-${timestamp}.${format}`;
+        
+        if (format === 'png') {
+          link.href = canvas.toDataURL('image/png');
+        } else {
+          link.href = canvas.toDataURL('image/jpeg', 0.95);
+        }
+        
+        link.click();
+      }
+    } catch (error) {
+      console.error('Error downloading map:', error);
+      alert('Failed to download map. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  }, []);
+
   // Initial center - only used on first render, map position is user-controlled after that
   const initialCenter = useMemo(() => {
     if (markers.length > 0) {
@@ -548,7 +625,7 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full" ref={mapContainerRef}>
       <GoogleMap
         mapContainerStyle={containerStyle}
         center={initialCenter}
@@ -650,7 +727,7 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
       </GoogleMap>
 
       {/* Drawing Toolbar */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 hide-on-download">
         <div className="bg-white rounded-lg shadow-lg p-2 flex items-center gap-2">
           {/* Pencil tool */}
           <button
@@ -693,7 +770,7 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
             <>
               <div className="w-px h-6 bg-gray-300 mx-1" />
               <button
-                onClick={deleteAllShapes}
+                onClick={() => setShowDeleteAllShapesModal(true)}
                 className="p-2 hover:bg-red-50 rounded-lg transition-colors text-gray-500 hover:text-red-600"
                 title="Delete All Shapes"
               >
@@ -701,6 +778,70 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
+            </>
+          )}
+
+          {/* Download button */}
+          {!isPencilMode && (
+            <>
+              <div className="w-px h-6 bg-gray-300 mx-1" />
+              <div className="relative download-menu-container">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDownloadMenu(!showDownloadMenu);
+                  }}
+                  disabled={isDownloading}
+                  className={`p-2 rounded-lg transition-colors flex items-center gap-2 ${
+                    isDownloading
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'hover:bg-green-50 text-gray-700 hover:text-green-600'
+                  }`}
+                  title="Download map"
+                >
+                  {isDownloading ? (
+                    <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full" />
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  )}
+                </button>
+                
+                {/* Download dropdown menu */}
+                {showDownloadMenu && (
+                  <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-100 py-2 min-w-[160px] z-50">
+                    <p className="px-3 py-1 text-xs text-gray-400 uppercase tracking-wider">Export as</p>
+                    <button
+                      onClick={() => downloadMap('png')}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                    >
+                      <svg className="h-4 w-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      PNG (High Quality)
+                    </button>
+                    <button
+                      onClick={() => downloadMap('jpeg')}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                    >
+                      <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      JPEG (Smaller Size)
+                    </button>
+                    <button
+                      onClick={() => downloadMap('pdf')}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                    >
+                      <svg className="h-4 w-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      PDF Document
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -716,7 +857,7 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
 
       {/* Selected shape actions */}
       {selectedShape !== null && !isPencilMode && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10 bg-white rounded-lg shadow-lg p-3">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10 bg-white rounded-lg shadow-lg p-3 hide-on-download">
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-700">Shape selected</span>
             
@@ -770,14 +911,69 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
       )}
 
       {/* Zoom indicator */}
-      <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-md text-sm text-gray-700">
+      <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-md text-sm text-gray-700 hide-on-download">
         Zoom: {currentZoom}
       </div>
 
       {/* Shapes count */}
       {shapes.length > 0 && (
-        <div className="absolute bottom-4 left-28 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-md text-sm text-gray-700">
+        <div className="absolute bottom-4 left-28 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-md text-sm text-gray-700 hide-on-download">
           {shapes.length} shape{shapes.length !== 1 ? 's' : ''}
+        </div>
+      )}
+
+      {/* Delete All Shapes Confirmation Modal */}
+      {showDeleteAllShapesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowDeleteAllShapesModal(false)}
+          />
+          
+          {/* Modal */}
+          <div className="relative bg-white rounded-2xl shadow-2xl p-6 max-w-sm mx-4 animate-in fade-in zoom-in duration-200">
+            {/* Warning icon */}
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+            </div>
+            
+            <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
+              Delete All Shapes?
+            </h3>
+            <p className="text-gray-500 text-center mb-2">
+              This will permanently delete all <span className="font-semibold text-gray-700">{shapes.length}</span> shape{shapes.length !== 1 ? 's' : ''} from the map. This action cannot be undone.
+            </p>
+            <p className="text-gray-400 text-sm text-center mb-6">
+              💡 Tip: Click on an individual shape to select and delete it separately.
+            </p>
+            
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteAllShapesModal(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteAllShapes();
+                  setShowDeleteAllShapesModal(false);
+                }}
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete All
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
