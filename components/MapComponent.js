@@ -277,7 +277,13 @@ const recognizeShape = (path) => {
   return { type: 'freehand', path };
 };
 
-export default function MapComponent({ markers = [], shapes = [], onShapesChange }) {
+export default function MapComponent({ 
+  markers = [], 
+  shapes = [], 
+  onShapesChange,
+  colorLabels = {},
+  onColorLabelsChange,
+}) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
@@ -305,6 +311,11 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
   
   // Delete confirmation modal state
   const [showDeleteAllShapesModal, setShowDeleteAllShapesModal] = useState(false);
+  
+  // Legend card state
+  const [showLegend, setShowLegend] = useState(false);
+  const [editingColor, setEditingColor] = useState(null);
+  const [tempLabel, setTempLabel] = useState('');
   
   // Shape refs for editing
   const shapeRefs = useRef({});
@@ -921,6 +932,201 @@ export default function MapComponent({ markers = [], shapes = [], onShapesChange
           {shapes.length} shape{shapes.length !== 1 ? 's' : ''}
         </div>
       )}
+
+      {/* Legend Card */}
+      <div className="absolute bottom-4 right-4 z-10">
+        {/* Toggle Button */}
+        <button
+          onClick={() => setShowLegend(!showLegend)}
+          className="shadow-lg rounded-lg px-3 py-2 flex items-center gap-2 transition-colors mb-2 ml-auto"
+          style={{ backgroundColor: '#FACC15' }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#EAB308'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FACC15'}
+        >
+          <svg className="w-4 h-4" style={{ color: '#1f2937' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <span className="text-sm font-semibold" style={{ color: '#1f2937' }}>Legend</span>
+          <svg 
+            className={`w-4 h-4 transition-transform ${showLegend ? 'rotate-180' : ''}`}
+            style={{ color: '#374151' }}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+
+        {/* Legend Panel */}
+        {showLegend && (
+          <div className="rounded-2xl shadow-2xl overflow-hidden w-72" style={{ backgroundColor: '#ffffff', border: '1px solid #f3f4f6' }}>
+            <div className="px-4 py-3" style={{ backgroundColor: '#263788' }}>
+              <div className="flex items-center gap-3">
+                <img 
+                  src="/logo.png" 
+                  alt="Drive & Shine" 
+                  className="h-10 w-auto object-contain"
+                />
+                <div>
+                  <h3 className="font-semibold text-sm" style={{ color: '#ffffff' }}>Shape Legend</h3>
+                  <p className="text-xs" style={{ color: '#94a3b8' }}>Click a color to add a label</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-2 max-h-96 overflow-y-auto">
+              <div className="space-y-1">
+                {Object.entries(SHAPE_COLORS).map(([key, value]) => {
+                  const shapesWithColor = shapes.filter(s => s.color === key).length;
+                  const hasLabel = colorLabels[key];
+                  const isEditing = editingColor === key;
+                  
+                  return (
+                    <div 
+                      key={key} 
+                      className="group flex items-center gap-3 px-3 py-2 rounded-xl transition-all"
+                      style={{
+                        backgroundColor: isEditing ? '#eff6ff' : 'transparent',
+                        boxShadow: isEditing ? 'inset 0 0 0 2px #bfdbfe' : 'none',
+                        cursor: (!hasLabel && !isEditing) ? 'pointer' : 'default',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isEditing) e.currentTarget.style.backgroundColor = '#f9fafb';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isEditing) e.currentTarget.style.backgroundColor = isEditing ? '#eff6ff' : 'transparent';
+                      }}
+                      onClick={() => {
+                        if (!hasLabel && !isEditing) {
+                          setEditingColor(key);
+                          setTempLabel('');
+                        }
+                      }}
+                    >
+                      {/* Color circle */}
+                      <div 
+                        className="w-6 h-6 rounded-full flex-shrink-0 shadow-md ring-2 ring-white"
+                        style={{ backgroundColor: value }}
+                      />
+                      
+                      {/* Content area */}
+                      <div className="flex-1 min-w-0">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={tempLabel}
+                            onChange={(e) => setTempLabel(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && tempLabel.trim()) {
+                                onColorLabelsChange && onColorLabelsChange({ ...colorLabels, [key]: tempLabel.trim() });
+                                setEditingColor(null);
+                                setTempLabel('');
+                              } else if (e.key === 'Escape') {
+                                setEditingColor(null);
+                                setTempLabel('');
+                              }
+                            }}
+                            onBlur={() => {
+                              if (tempLabel.trim()) {
+                                onColorLabelsChange && onColorLabelsChange({ ...colorLabels, [key]: tempLabel.trim() });
+                              }
+                              setEditingColor(null);
+                              setTempLabel('');
+                            }}
+                            placeholder="Type label & press Enter"
+                            className="w-full px-2 py-1 text-sm rounded-lg focus:outline-none"
+                            style={{ backgroundColor: '#ffffff', border: '1px solid #93c5fd' }}
+                            autoFocus
+                          />
+                        ) : hasLabel ? (
+                          <span className="text-sm font-medium truncate block" style={{ color: '#1f2937' }}>
+                            {colorLabels[key]}
+                          </span>
+                        ) : (
+                          <span className="text-sm italic" style={{ color: '#9ca3af' }}>
+                            Click to add label...
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Shape count badge */}
+                      {shapesWithColor > 0 && !isEditing && (
+                        <span 
+                          className="text-xs font-medium px-1.5 py-0.5 rounded-full text-white flex-shrink-0"
+                          style={{ backgroundColor: value }}
+                        >
+                          {shapesWithColor}
+                        </span>
+                      )}
+                      
+                      {/* Hover actions for labeled items */}
+                      {hasLabel && !isEditing && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingColor(key);
+                              setTempLabel(colorLabels[key]);
+                            }}
+                            className="p-1 rounded-md transition-colors"
+                            style={{ backgroundColor: 'transparent' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            title="Edit label"
+                          >
+                            <svg className="w-3.5 h-3.5" style={{ color: '#6b7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onColorLabelsChange && onColorLabelsChange({ ...colorLabels, [key]: '' });
+                            }}
+                            className="p-1 rounded-md transition-colors"
+                            style={{ backgroundColor: 'transparent' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            title="Remove label"
+                          >
+                            <svg className="w-3.5 h-3.5" style={{ color: '#ef4444' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer with count */}
+            <div className="px-4 py-2" style={{ borderTop: '1px solid #f3f4f6', backgroundColor: 'rgba(249, 250, 251, 0.8)' }}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: '#6b7280' }}>
+                  {Object.values(colorLabels).filter(v => v).length} of {Object.keys(SHAPE_COLORS).length} labeled
+                </span>
+                {Object.values(colorLabels).some(v => v) && (
+                  <button
+                    onClick={() => onColorLabelsChange && onColorLabelsChange({
+                      red: '', blue: '', green: '', purple: '', orange: '',
+                      yellow: '', pink: '', cyan: '', brown: '', black: '',
+                    })}
+                    className="text-xs font-medium"
+                    style={{ color: '#ef4444' }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#b91c1c'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#ef4444'}
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Delete All Shapes Confirmation Modal */}
       {showDeleteAllShapesModal && (

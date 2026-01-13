@@ -28,8 +28,13 @@ export default function Dashboard() {
   const [authLoading, setAuthLoading] = useState(true);
   const [markers, setMarkers] = useState([]);
   const [shapes, setShapes] = useState([]);
+  const [colorLabels, setColorLabels] = useState({
+    red: '', blue: '', green: '', purple: '', orange: '',
+    yellow: '', pink: '', cyan: '', brown: '', black: '',
+  });
   const [markersLoading, setMarkersLoading] = useState(true);
   const [shapesLoading, setShapesLoading] = useState(true);
+  const [colorLabelsLoading, setColorLabelsLoading] = useState(true);
   const [geocoding, setGeocoding] = useState(false);
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -105,6 +110,27 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [user]);
 
+  // Load color labels from Firestore when user is authenticated
+  useEffect(() => {
+    if (!user) return;
+
+    const colorLabelsRef = doc(db, 'users', user.uid, 'settings', 'colorLabels');
+    
+    // Real-time listener for color labels
+    const unsubscribe = onSnapshot(colorLabelsRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data();
+        setColorLabels(prev => ({ ...prev, ...data }));
+      }
+      setColorLabelsLoading(false);
+    }, (error) => {
+      console.error('Error loading color labels:', error);
+      setColorLabelsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
   // Handle shapes change from MapComponent
   const handleShapesChange = async (newShapes) => {
     if (!user) return;
@@ -133,6 +159,22 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Error updating shapes:', err);
       setError('Failed to save shape. Please try again.');
+    }
+  };
+
+  // Handle color labels change from MapComponent
+  const handleColorLabelsChange = async (newLabels) => {
+    if (!user) return;
+
+    // Optimistic update - update UI immediately
+    setColorLabels(newLabels);
+
+    try {
+      const colorLabelsRef = doc(db, 'users', user.uid, 'settings', 'colorLabels');
+      await setDoc(colorLabelsRef, newLabels);
+    } catch (err) {
+      console.error('Error updating color labels:', err);
+      setError('Failed to save color label. Please try again.');
     }
   };
 
@@ -473,7 +515,13 @@ export default function Dashboard() {
 
       {/* Map */}
       <div className="flex-1 relative">
-        <MapComponent markers={markers} shapes={shapes} onShapesChange={handleShapesChange} />
+        <MapComponent 
+          markers={markers} 
+          shapes={shapes} 
+          onShapesChange={handleShapesChange}
+          colorLabels={colorLabels}
+          onColorLabelsChange={handleColorLabelsChange}
+        />
         
         {/* Mobile menu button */}
         <button
