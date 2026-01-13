@@ -1128,8 +1128,8 @@ export default function MapComponent({
         )}
       </div>
 
-      {/* Static Legend for Download - Simple table layout that html2canvas renders correctly */}
-      {isDownloading && showLegend && (
+      {/* Static Legend for Download - Only shows labeled colors */}
+      {isDownloading && showLegend && Object.values(colorLabels).some(v => v) && (
         <div 
           style={{
             position: 'absolute',
@@ -1164,15 +1164,13 @@ export default function MapComponent({
             </table>
           </div>
           
-          {/* Legend Items - Simple table layout */}
+          {/* Legend Items - Only show labeled colors */}
           <div style={{ padding: '8px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
-                {Object.entries(SHAPE_COLORS).map(([key, value]) => {
-                  const shapesWithColor = shapes.filter(s => s.color === key).length;
-                  const label = colorLabels[key] || 'Unlabeled';
-                  
-                  return (
+                {Object.entries(SHAPE_COLORS)
+                  .filter(([key]) => colorLabels[key]) // Only show colors with labels
+                  .map(([key, value]) => (
                     <tr key={key} style={{ height: '32px' }}>
                       {/* Color dot */}
                       <td style={{ width: '32px', textAlign: 'center', verticalAlign: 'middle' }}>
@@ -1193,40 +1191,17 @@ export default function MapComponent({
                         verticalAlign: 'middle', 
                         paddingLeft: '8px',
                         fontSize: '13px',
-                        color: colorLabels[key] ? '#1f2937' : '#9ca3af',
-                        fontStyle: colorLabels[key] ? 'normal' : 'italic'
+                        color: '#1f2937',
+                        fontWeight: '500'
                       }}>
-                        {label}
-                      </td>
-                      {/* Count - simple colored number */}
-                      <td style={{ 
-                        width: '40px', 
-                        textAlign: 'right', 
-                        verticalAlign: 'middle', 
-                        paddingRight: '12px',
-                        fontSize: '14px',
-                        fontWeight: '700',
-                        color: shapesWithColor > 0 ? value : 'transparent'
-                      }}>
-                        {shapesWithColor > 0 ? shapesWithColor : ''}
+                        {colorLabels[key]}
                       </td>
                     </tr>
-                  );
-                })}
+                  ))}
               </tbody>
             </table>
           </div>
           
-          {/* Footer */}
-          <div style={{ 
-            borderTop: '1px solid #e5e7eb', 
-            padding: '8px 16px', 
-            backgroundColor: '#f9fafb',
-            fontSize: '11px',
-            color: '#6b7280'
-          }}>
-            {Object.values(colorLabels).filter(v => v).length} of {Object.keys(SHAPE_COLORS).length} labeled
-          </div>
         </div>
       )}
 
