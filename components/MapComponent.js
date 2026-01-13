@@ -933,8 +933,8 @@ export default function MapComponent({
         </div>
       )}
 
-      {/* Legend Card */}
-      <div className="absolute bottom-4 right-4 z-10">
+      {/* Legend Card - Interactive Version (hidden during download) */}
+      <div className="absolute bottom-4 right-4 z-10 hide-on-download">
         {/* Toggle Button */}
         <button
           onClick={() => setShowLegend(!showLegend)}
@@ -1127,6 +1127,108 @@ export default function MapComponent({
           </div>
         )}
       </div>
+
+      {/* Static Legend for Download - Simple table layout that html2canvas renders correctly */}
+      {isDownloading && showLegend && (
+        <div 
+          style={{
+            position: 'absolute',
+            bottom: '16px',
+            right: '16px',
+            zIndex: 10,
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            overflow: 'hidden',
+            width: '280px',
+            border: '1px solid #e5e7eb'
+          }}
+        >
+          {/* Header */}
+          <div style={{ backgroundColor: '#263788', padding: '12px 16px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: '50px', verticalAlign: 'middle' }}>
+                    <img 
+                      src="/logo.png" 
+                      alt="Drive & Shine" 
+                      style={{ height: '36px', width: 'auto' }}
+                    />
+                  </td>
+                  <td style={{ verticalAlign: 'middle', paddingLeft: '10px' }}>
+                    <div style={{ color: '#ffffff', fontWeight: '600', fontSize: '14px' }}>Shape Legend</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Legend Items - Simple table layout */}
+          <div style={{ padding: '8px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                {Object.entries(SHAPE_COLORS).map(([key, value]) => {
+                  const shapesWithColor = shapes.filter(s => s.color === key).length;
+                  const label = colorLabels[key] || 'Unlabeled';
+                  
+                  return (
+                    <tr key={key} style={{ height: '32px' }}>
+                      {/* Color dot */}
+                      <td style={{ width: '32px', textAlign: 'center', verticalAlign: 'middle' }}>
+                        <div 
+                          style={{ 
+                            width: '20px', 
+                            height: '20px', 
+                            borderRadius: '50%', 
+                            backgroundColor: value,
+                            display: 'inline-block',
+                            border: '2px solid white',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                          }} 
+                        />
+                      </td>
+                      {/* Label */}
+                      <td style={{ 
+                        verticalAlign: 'middle', 
+                        paddingLeft: '8px',
+                        fontSize: '13px',
+                        color: colorLabels[key] ? '#1f2937' : '#9ca3af',
+                        fontStyle: colorLabels[key] ? 'normal' : 'italic'
+                      }}>
+                        {label}
+                      </td>
+                      {/* Count - simple colored number */}
+                      <td style={{ 
+                        width: '40px', 
+                        textAlign: 'right', 
+                        verticalAlign: 'middle', 
+                        paddingRight: '12px',
+                        fontSize: '14px',
+                        fontWeight: '700',
+                        color: shapesWithColor > 0 ? value : 'transparent'
+                      }}>
+                        {shapesWithColor > 0 ? shapesWithColor : ''}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Footer */}
+          <div style={{ 
+            borderTop: '1px solid #e5e7eb', 
+            padding: '8px 16px', 
+            backgroundColor: '#f9fafb',
+            fontSize: '11px',
+            color: '#6b7280'
+          }}>
+            {Object.values(colorLabels).filter(v => v).length} of {Object.keys(SHAPE_COLORS).length} labeled
+          </div>
+        </div>
+      )}
 
       {/* Delete All Shapes Confirmation Modal */}
       {showDeleteAllShapesModal && (
